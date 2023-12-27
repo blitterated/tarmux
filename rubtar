@@ -1,43 +1,54 @@
 #!/usr/bin/env ruby
 
 require 'open3'
+require 'optparse'
 
-def run(dest_folder, source_folder = ".")
-  Dir.chdir(source_folder) do
-    target_folders = Dir.glob('*').select { |f| File.directory? f }
-    #tar_folders(dest_folder, target_folders)
-    tar_folders(dest_folder, target_folders) { |cmd| puts "#{cmd}" }
+class TarMux
+
+  def initialize(destination_folder: , source_folder: ".")
+    @dest_folder = destination_folder
+    @source_folder = source_folder
   end
-end
 
-def tar_folders(dest_folder, folders)
-  folders.each do |f|
-    tar_cmd = %(tar -I 'gzip -9' cvf "#{dest_folder}/#{f}.tgz" "#{f}")
-
-    if block_given?
-      yield(tar_cmd)
-    else
-      run_command(tar_cmd)
+  def run()
+    Dir.chdir(@source_folder) do
+      target_folders = Dir.glob('*').select { |f| File.directory? f }
+      #tar_folders(target_folders)
+      tar_folders(target_folders) { |cmd| puts "#{cmd}" }
     end
   end
-end
 
-def run_command(shell_cmd)
-  Open3.popen3("bash") do | stdin, stdout, stderr, wait_thread |
+  def tar_folders(folders)
+    folders.each do |f|
+      tar_cmd = %(tar -I 'gzip -9' cvf "#{@dest_folder}/#{f}.tgz" "#{f}")
 
-    stdout_thr = Thread.new { stdout.each {|line| puts line } }
-    stderr_thr = Thread.new { stderr.each {|line| puts line.red } }
-
-    stdin.puts(shell_cmd)
-
-    wait_thread.value
+      if block_given?
+        yield(tar_cmd)
+      else
+        run_command(tar_cmd)
+      end
+    end
   end
+
+  def run_command(shell_cmd)
+    Open3.popen3("bash") do | stdin, stdout, stderr, wait_thread |
+
+      stdout_thr = Thread.new { stdout.each {|line| puts line } }
+      stderr_thr = Thread.new { stderr.each {|line| puts line.red } }
+
+      stdin.puts(shell_cmd)
+
+      wait_thread.value
+    end
+  end
+
 end
 
+# Make the ASCII run red with the blood of the STDERR's enemies 
 class String
   def red
     "\e[31m#{self}\e[0m"
   end
 end
 
-run("/cygdrive/d/src/Tardis/old-work-src")
+TarMux.new(destination_folder: "/cygdrive/d/src/Tardis/old-work-src").run
