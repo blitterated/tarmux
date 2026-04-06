@@ -3,16 +3,59 @@
 require 'open3'
 require 'optparse'
 
+class TarMuxCLI
+
+  def initialize
+    # Default option values
+    @options = {source_folder: "."}
+  end
+
+  def create_parser
+    OptionParser.new do |opts|
+      opts.banner = get_optparse_banner
+
+      opts.on('-d', '--destination-folder DEST', 'The directory where the tarballs will be saved')
+      opts.on('-s', '--source-folder [SOURCE]', 'The directory containing the subdirectories to be tarballed')
+    end
+  end
+
+  def parse!(args)
+    option_parser = create_parser
+
+    begin
+      option_parser.parse!(args, into: @options)
+    rescue OptionParser::InvalidOption => opt_err
+      puts "#{opt_err.message}\n".red
+      puts option_parser.help
+      exit 1
+    end
+
+    @options
+  end
+
+  def get_optparse_banner()
+  "
+Create individual tarballs for each subdirectory in a directory.
+
+Usage: #{File.basename($PROGRAME_NAME)} [options]
+"
+  end
+end
+
 class TarMux
 
-  def initialize(destination_folder: , source_folder: ".")
+  def initialize(destination_folder:, source_folder:)
     @dest_folder = destination_folder
     @source_folder = source_folder
   end
 
   def run()
+    # match hidden dot folders by default
+    glob_opts = File::FNM_DOTMATCH
+
     Dir.chdir(@source_folder) do
-      target_folders = Dir.glob('*').select { |f| File.directory? f }
+      children = Dir.glob('*', glob_opts)
+      target_folders = children.select { |d| File.directory? d }
       #tar_folders(target_folders)
       tar_folders(target_folders) { |cmd| puts "#{cmd}" }
     end
@@ -41,14 +84,18 @@ class TarMux
       wait_thread.value
     end
   end
-
 end
 
-# Make the ASCII run red with the blood of the STDERR's enemies 
+# Make the ASCII run red with the blood of the STDERR's enemies
 class String
   def red
     "\e[31m#{self}\e[0m"
   end
 end
 
-TarMux.new(destination_folder: "/cygdrive/d/src/Tardis/old-work-src").run
+puts "script name: #{File.basename(__FILE__)}"
+
+#options = TarMuxCLI.new.parse!(ARGV)
+#TarMux.new(**options).run
+
+#tarmux --destination_folder "/cygdrive/d/src/Tardis/old-work-src"
